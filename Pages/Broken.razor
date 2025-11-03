@@ -1,0 +1,62 @@
+﻿@page "/"
+@using ScottPlot
+@using ScottPlot.Blazor
+
+<h1>ScottPlot 5 in Blazor</h1>
+<BlazorPlot @ref=BlazorPlot Style="width: 400px; height: 300px;"/>
+
+@code {
+    BlazorPlot BlazorPlot { get; set; } = new();
+    
+    public record Measurement(DateTime DateTime, double Value);
+    public List<List<Measurement>> Trends = [];
+    
+    protected override void OnInitialized()
+    {
+        var numPoints = 30;
+        
+        var dateTimesA = Enumerable.Range(0, numPoints)
+            .Select(i => new DateTime(2025, 1, 1).AddDays(i))
+            .ToArray();
+        var valuesA = Generate.Sin(numPoints, 1, 0.2);
+        Trends.Add(dateTimesA.Zip(valuesA, (dt, val) => new Measurement(dt, val)).ToList());
+        
+        var dateTimesB = Enumerable.Range(0, numPoints)
+            .Select(i => new DateTime(2025, 1, 15).AddDays(i))
+            .ToArray();
+        var valuesB = Generate.Sin(numPoints, 1, 0.2);
+        Trends.Add(dateTimesB.Zip(valuesB, (dt, val) => new Measurement(dt, val)).ToList());
+        
+        base.OnInitialized();
+    }
+    
+    protected override void OnAfterRender(bool firstRender)
+    {
+        BlazorPlot.Multiplot.AddPlots(Trends.Count);
+        var idx = 0;
+        foreach (var trend in Trends)
+        {
+            var plot = BlazorPlot.Multiplot.GetPlot(idx);
+            plot.Clear();
+            
+            var orderedMeasurements = trend
+                .OrderBy(m => m.DateTime)
+                .ToArray();
+            
+            _ = plot.Add.SignalXY(
+                orderedMeasurements
+                    .Select(m => m.DateTime)
+                    .ToArray(),
+                orderedMeasurements
+                    .Select(m => m.Value)
+                    .ToArray());
+            plot.Axes.DateTimeTicksBottom();
+            idx++;
+        }
+        
+        BlazorPlot.Multiplot.SharedAxes.ShareX(BlazorPlot.Multiplot.GetPlots());
+        BlazorPlot.Multiplot.CollapseVertically(); // <- Exception thrown here
+        
+        BlazorPlot.Refresh();
+    }
+}

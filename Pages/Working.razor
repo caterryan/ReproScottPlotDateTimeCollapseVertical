@@ -1,18 +1,17 @@
-﻿@page "/"
+﻿@page "/working"
 @using ScottPlot
+@using ScottPlot.AxisPanels
 @using ScottPlot.Blazor
 
 <h1>ScottPlot 5 in Blazor</h1>
-
 <BlazorPlot @ref=BlazorPlot Style="width: 400px; height: 300px;"/>
 
 @code {
     BlazorPlot BlazorPlot { get; set; } = new();
     
     public record Measurement(DateTime DateTime, double Value);
-
     public List<List<Measurement>> Trends = [];
-
+    
     protected override void OnInitialized()
     {
         var numPoints = 30;
@@ -31,11 +30,10 @@
         
         base.OnInitialized();
     }
-
+    
     protected override void OnAfterRender(bool firstRender)
     {
         BlazorPlot.Multiplot.AddPlots(Trends.Count);
-
         var idx = 0;
         foreach (var trend in Trends)
         {
@@ -53,16 +51,48 @@
                 orderedMeasurements
                     .Select(m => m.Value)
                     .ToArray());
-
             plot.Axes.DateTimeTicksBottom();
-
-            idx ++;
+            idx++;
         }
         
         BlazorPlot.Multiplot.SharedAxes.ShareX(BlazorPlot.Multiplot.GetPlots());
-        BlazorPlot.Multiplot.CollapseVertically();
+        CollapseVerticalWorkaround();
         
         BlazorPlot.Refresh();
     }
-
+    
+    private void CollapseVerticalWorkaround()
+    {
+        var plots = BlazorPlot.Multiplot.GetPlots();
+        foreach (var plot in plots)
+        {
+            var isNotFirst = plot != plots.First();
+            var isNotLast = plot != plots.Last();
+    
+            if (isNotFirst)
+            {
+                // Collapse top axes that aren't DateTime
+                foreach (var axis in plot.Axes.GetAxes().Where(x => x.Edge == Edge.Top))
+                {
+                    if (axis is DateTimeXAxis) continue;
+                    axis.MaximumSize = 0;
+                    axis.RemoveTickGenerator();
+                }
+            }
+    
+            if (isNotLast)
+            {
+                // For DateTime axes, just set MaximumSize without removing tick generator
+                foreach (var axis in plot.Axes.GetAxes().Where(x => x.Edge == Edge.Bottom))
+                {
+                    axis.MaximumSize = 0;
+                    // Don't call RemoveTickGenerator() for DateTime axes
+                    if (axis is not DateTimeXAxis)
+                    {
+                        axis.RemoveTickGenerator();
+                    }
+                }
+            }
+        }
+    }
 }
